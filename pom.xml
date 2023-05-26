@@ -106,7 +106,9 @@
     </developer>
   </developers>
   <properties>
-    <argLine>-Xmx2G -Djava.net.preferIPv4Stack=true -Dio.netty.leakDetection.level=paranoid ${test.additional.args}</argLine>
+    <argLine>
+      -Xmx2G -Djava.net.preferIPv4Stack=true -Dio.netty.leakDetection.level=paranoid ${test.additional.args}
+    </argLine>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     <javac.target>1.8</javac.target>
@@ -219,6 +221,12 @@
   <!-- dependency definitions -->
   <dependencyManagement>
     <dependencies>
+      <!-- ba-dua -->
+      <dependency>
+        <groupId>br.usp.each.saeg</groupId>
+        <artifactId>ba-dua</artifactId>
+        <version>0.8.1-SNAPSHOT</version>
+      </dependency>
       <!-- provided dependencies -->
       <dependency>
         <groupId>com.github.spotbugs</groupId>

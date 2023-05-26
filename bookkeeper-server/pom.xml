@@ -26,6 +26,11 @@
   <name>Apache BookKeeper :: Server</name>
   <dependencies>
     <dependency>
+      <groupId>br.usp.each.saeg</groupId>
+      <artifactId>ba-dua</artifactId>
+      <version>0.8.1-SNAPSHOT</version>
+    </dependency>
+    <dependency>
       <groupId>org.apache.bookkeeper</groupId>
       <artifactId>bookkeeper-common</artifactId>
       <version>${project.parent.version}</version>
@@ -231,6 +236,11 @@
   </dependencies>
   <build>
     <plugins>
+      <plugin>
+      <groupId>org.jacoco</groupId>
+      <artifactId>jacoco-maven-plugin</artifactId>
+      <version>0.8.5</version>
+      </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
