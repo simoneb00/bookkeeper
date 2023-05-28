@@ -221,12 +221,13 @@
   <!-- dependency definitions -->
   <dependencyManagement>
     <dependencies>
-      <!-- ba-dua -->
+      <!-- ba-dua
       <dependency>
         <groupId>br.usp.each.saeg</groupId>
         <artifactId>ba-dua</artifactId>
         <version>0.8.1-SNAPSHOT</version>
       </dependency>
+      -->
       <!-- provided dependencies -->
       <dependency>
         <groupId>com.github.spotbugs</groupId>
@@ -960,6 +961,7 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <version>${maven-surefire-plugin.version}</version>
+        <!--
         <configuration>
           <redirectTestOutputToFile>${redirectTestOutputToFile}</redirectTestOutputToFile>
           <forkCount>${forkCount.variable}</forkCount>
@@ -968,6 +970,7 @@
           <forkedProcessTimeoutInSeconds>1800</forkedProcessTimeoutInSeconds>
           <rerunFailingTestsCount>${testRetryCount}</rerunFailingTestsCount>
         </configuration>
+        -->
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>

@@ -307,6 +307,7 @@ public class ZKRegistrationClient implements RegistrationClient {
         return promise;
     }
 
+
     @SuppressWarnings("unchecked")
     @VisibleForTesting
     static BookieServiceInfo deserializeBookieServiceInfo(BookieId bookieId, byte[] bookieServiceInfo)
@@ -335,6 +336,8 @@ public class ZKRegistrationClient implements RegistrationClient {
 
         return bsi;
     }
+
+
 
     /**
      * Reads the list of bookies at the given path and eagerly caches the BookieServiceInfo

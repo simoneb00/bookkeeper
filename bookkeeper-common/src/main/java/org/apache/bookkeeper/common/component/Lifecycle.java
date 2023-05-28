@@ -122,6 +122,7 @@ public class Lifecycle {
 
 
     public boolean moveToStarted() throws IllegalStateException {
+
         State localState = this.state;
         if (localState == State.INITIALIZED || localState == State.STOPPED) {
             state = State.STARTED;
@@ -134,6 +135,7 @@ public class Lifecycle {
             throw new IllegalStateException("Can't move to started state when closed");
         }
         throw new IllegalStateException("Can't move to started with unknown state");
+
     }
 
     public boolean canMoveToStopped() throws IllegalStateException {
