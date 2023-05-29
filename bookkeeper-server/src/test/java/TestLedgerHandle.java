@@ -8,6 +8,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import utils.BookKeeperClusterTestCase;
 
+import java.awt.print.Book;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collection;
@@ -29,12 +30,12 @@ public class TestLedgerHandle extends BookKeeperClusterTestCase {
     public static Collection<Object[]> getParameters() {
         return Arrays.asList(new Object[][]{
                 // data,           offset, length, exception expected
-                {"data".getBytes(),    4,    0,     false},            // expected: no bytes written, but no exceptions
-                {"data".getBytes(),    0,    4,     false},            // expected: "data" is correctly written on the ledger
-                {"data".getBytes(),    4,    1,     true},             // expected: exception
-                {"".getBytes(),        0,    0,     true},             // expected: exception
-                {null,                 0,    0,     true},             // expected: exception
-                {null,                -1,    0,     true}              // expected: exception
+                {"data".getBytes(), 4, 0, false},            // expected: no bytes written, but no exceptions
+                {"data".getBytes(), 0, 4, false},            // expected: "data" is correctly written on the ledger
+                {"data".getBytes(), 4, 1, true},             // expected: exception
+                {"".getBytes(), 0, 0, true},             // expected: exception
+                {null, 0, 0, true},             // expected: exception
+                {null, -1, 0, true}              // expected: exception
         });
     }
 
@@ -62,27 +63,22 @@ public class TestLedgerHandle extends BookKeeperClusterTestCase {
         this.ledgerHandle = this.bookKeeper.createLedger(4, 3, 2, BookKeeper.DigestType.CRC32, "password".getBytes());
     }
 
+
     @Test
     public void testLedgerHandle() throws org.apache.bookkeeper.client.api.BKException {
         try {
-            if (this.exceptionExpected)
-                testWithExceptions();
-            else {
-                ledgerHandle.addEntry(this.data, this.offset, this.length);
-                LedgerEntry le = ledgerHandle.readLastEntry();
-                Assert.assertEquals(new String(le.getEntry(), StandardCharsets.UTF_8), new String(Arrays.copyOfRange(this.data, this.offset, this.offset + this.length), StandardCharsets.UTF_8));
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
+            ledgerHandle.addEntry(this.data, this.offset, this.length);
+            LedgerEntry le = ledgerHandle.readLastEntry();
+            Assert.assertEquals(new String(le.getEntry(), StandardCharsets.UTF_8), new String(Arrays.copyOfRange(this.data, this.offset, this.offset + this.length), StandardCharsets.UTF_8));
+        } catch(Exception e) {
+            Assert.assertTrue(this.exceptionExpected);
         }
     }
 
-    @Test(expected = Exception.class)
-    public void testWithExceptions() throws Exception {
-        this.ledgerHandle.addEntry(this.data, this.offset, this.length);
+
+    @Test
+    public void testGetNumBookies() {
+        long numBookies = this.ledgerHandle.getNumBookies();
+        Assert.assertEquals(numBookies, 4);
     }
-
-
-
-
 }

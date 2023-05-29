@@ -148,7 +148,7 @@
     <jmh.version>1.19</jmh.version>
     <jmock.version>2.8.2</jmock.version>
     <jsoup.version>1.14.3</jsoup.version>
-    <junit.version>4.12</junit.version>
+    <junit.version>4.13.1</junit.version>
     <!-- required by zookeeper test utilities imported from ZooKeeper -->
     <junit5.version>5.8.2</junit5.version>
     <libthrift.version>0.14.2</libthrift.version>
@@ -695,10 +695,18 @@
       </dependency>
 
       <!-- test dependencies -->
+      <!--
       <dependency>
         <groupId>junit</groupId>
         <artifactId>junit</artifactId>
         <version>${junit.version}</version>
+      </dependency>
+      -->
+      <dependency>
+        <groupId>org.junit.jupiter</groupId>
+        <artifactId>junit-jupiter</artifactId>
+        <version>5.8.0</version>
+        <scope>test</scope>
       </dependency>
       <dependency>
         <groupId>org.hamcrest</groupId>
@@ -846,11 +854,14 @@
       <artifactId>commons-configuration</artifactId>
     </dependency>
     <!-- test dependencies -->
+
+    <!--
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
       <scope>test</scope>
     </dependency>
+    -->
     <dependency><!-- Needed by junit -->
       <groupId>org.hamcrest</groupId>
       <artifactId>hamcrest-all</artifactId>
