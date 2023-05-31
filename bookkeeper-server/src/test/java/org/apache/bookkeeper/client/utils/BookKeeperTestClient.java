@@ -1,4 +1,4 @@
-package utils;
+package org.apache.bookkeeper.client.utils;
 
 import io.netty.buffer.UnpooledByteBufAllocator;
 import java.io.IOException;

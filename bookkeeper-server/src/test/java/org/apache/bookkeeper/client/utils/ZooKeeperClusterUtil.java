@@ -1,4 +1,4 @@
-package utils;
+package org.apache.bookkeeper.client.utils;
 
 import java.io.IOException;
 import java.nio.file.Files;

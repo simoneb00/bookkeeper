@@ -221,13 +221,11 @@
   <!-- dependency definitions -->
   <dependencyManagement>
     <dependencies>
-      <!-- ba-dua
       <dependency>
-        <groupId>br.usp.each.saeg</groupId>
-        <artifactId>ba-dua</artifactId>
-        <version>0.8.1-SNAPSHOT</version>
+        <groupId>org.mockito</groupId>
+        <artifactId>mockito-core</artifactId>
+        <version>5.3.1</version>
       </dependency>
-      -->
       <!-- provided dependencies -->
       <dependency>
         <groupId>com.github.spotbugs</groupId>

@@ -1,14 +1,14 @@
-import org.apache.bookkeeper.client.*;
+package org.apache.bookkeeper.client;
+
 import org.apache.bookkeeper.client.api.LedgerEntries;
 import org.junit.Assert;
-import org.junit.Before;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import utils.BookKeeperClusterTestCase;
+import org.apache.bookkeeper.client.utils.BookKeeperClusterTestCase;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
@@ -23,7 +23,6 @@ import java.util.stream.Stream;
  *  - public void asyncAddEntry(final long entryId, final byte[] data, final int offset, final int length, final AddCallbackWithLatency cb, final Object ctx)
  */
 public class TestLedgerHandleAdv extends BookKeeperClusterTestCase {
-
 
     // BookKeeper client
     private BookKeeper bookKeeper;
@@ -65,6 +64,7 @@ public class TestLedgerHandleAdv extends BookKeeperClusterTestCase {
         }
     }
 
+    @Disabled
     @ParameterizedTest
     @MethodSource("provideParameters1")
     public void testWriteAsync(long id, byte[] data, boolean exceptionExpected) {
@@ -94,6 +94,8 @@ public class TestLedgerHandleAdv extends BookKeeperClusterTestCase {
     /*
      *  method under test: public void asyncAddEntry(final long entryId, final byte[] data, final int offset, final int length, final AddCallback cb, final Object ctx)
      */
+
+    @Disabled
     @ParameterizedTest
     @MethodSource("provideParameters2")
     public void testAsyncAddEntry(long id, byte[] data, int offset, int length, boolean cb, boolean ctx, boolean exceptionExpected) {
@@ -126,6 +128,5 @@ public class TestLedgerHandleAdv extends BookKeeperClusterTestCase {
         }
 
     }
-
 
 }

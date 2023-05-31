@@ -1,4 +1,4 @@
-package utils;
+package org.apache.bookkeeper.client.utils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.bookkeeper.util.BookKeeperConstants.AVAILABLE_NODE;

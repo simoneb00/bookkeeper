@@ -1,4 +1,4 @@
-package utils;
+package org.apache.bookkeeper.client.utils;
 
 import org.apache.bookkeeper.bookie.UncleanShutdownDetection;
 

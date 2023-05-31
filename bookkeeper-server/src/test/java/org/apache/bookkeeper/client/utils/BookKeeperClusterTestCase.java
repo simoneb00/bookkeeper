@@ -1,4 +1,4 @@
-package utils;
+package org.apache.bookkeeper.client.utils;
 
 import static org.apache.bookkeeper.bookie.BookKeeperServerStats.BOOKIE_SCOPE;
 import static org.apache.bookkeeper.bookie.BookKeeperServerStats.LD_INDEX_SCOPE;
@@ -29,7 +29,7 @@ import org.apache.bookkeeper.bookie.BookieResources;
 import org.apache.bookkeeper.bookie.LedgerDirsManager;
 import org.apache.bookkeeper.bookie.LedgerStorage;
 import org.apache.bookkeeper.bookie.LegacyCookieValidation;
-//import org.apache.bookkeeper.bookie.utils.MockUncleanShutdownDetection;
+//import org.apache.bookkeeper.org.apache.bookkeeper.bookie.utils.MockUncleanShutdownDetection;
 import org.apache.bookkeeper.bookie.ReadOnlyBookie;
 import org.apache.bookkeeper.bookie.UncleanShutdownDetection;
 import org.apache.bookkeeper.bookie.UncleanShutdownDetectionImpl;
