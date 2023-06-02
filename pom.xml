@@ -896,7 +896,7 @@
         <plugin>
           <groupId>org.jacoco</groupId>
           <artifactId>jacoco-maven-plugin</artifactId>
-          <version>0.8.5</version>
+          <version>0.8.10</version>
           <executions>
             <execution>
               <goals>
@@ -971,15 +971,16 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <version>${maven-surefire-plugin.version}</version>
         <!--
-        <configuration>
-          <redirectTestOutputToFile>${redirectTestOutputToFile}</redirectTestOutputToFile>
-          <forkCount>${forkCount.variable}</forkCount>
-          <reuseForks>false</reuseForks>
-          <trimStackTrace>false</trimStackTrace>
-          <forkedProcessTimeoutInSeconds>1800</forkedProcessTimeoutInSeconds>
-          <rerunFailingTestsCount>${testRetryCount}</rerunFailingTestsCount>
-        </configuration>
-        -->
+                <configuration>
+                  <redirectTestOutputToFile>${redirectTestOutputToFile}</redirectTestOutputToFile>
+                  <forkCount>${forkCount.variable}</forkCount>
+                  <reuseForks>false</reuseForks>
+                  <trimStackTrace>false</trimStackTrace>
+                  <forkedProcessTimeoutInSeconds>1800</forkedProcessTimeoutInSeconds>
+                  <rerunFailingTestsCount>${testRetryCount}</rerunFailingTestsCount>
+
+        </configuration>-->
+
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>

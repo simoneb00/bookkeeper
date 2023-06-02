@@ -5,9 +5,9 @@ import io.netty.buffer.Unpooled;
 import org.apache.bookkeeper.client.BKException;
 import org.apache.bookkeeper.client.utils.TestBKConfiguration;
 import org.apache.bookkeeper.conf.ServerConfiguration;
-import org.apache.bookkeeper.net.BookieId;
 import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.WriteCallback;
 import org.awaitility.Awaitility;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -32,7 +32,7 @@ public class TestBookieImpl {
         RECOVERY_ADD_ENTRY
     }
 
-    private BookieImpl bookie;
+    private static BookieImpl bookie;
     private static final AtomicBoolean hasCompleted = new AtomicBoolean(false);
 
     public TestBookieImpl() {
@@ -77,11 +77,8 @@ public class TestBookieImpl {
             case VALID:
                 return (rc, ledgerId, entryId, addr, ctx) -> hasCompleted.set(rc == BKException.Code.OK);
             case INVALID:
-                return new WriteCallback() {
-                    @Override
-                    public void writeComplete(int rc, long ledgerId, long entryId, BookieId addr, Object ctx) {
-                        throw new RuntimeException("Invalid callback");
-                    }
+                return (rc, ledgerId, entryId, addr, ctx) -> {
+                    throw new RuntimeException("Invalid callback");
                 };
             default:
                 Assertions.fail("getCallback: Unexpected callBack type: " + type);
@@ -196,5 +193,9 @@ public class TestBookieImpl {
         return bb;
     }
 
+    @AfterAll
+    public static void cleanUp() {
+        //bookie.shutdown();
+    }
 
 }
