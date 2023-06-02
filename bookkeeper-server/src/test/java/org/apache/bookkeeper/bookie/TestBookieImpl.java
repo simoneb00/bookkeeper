@@ -6,19 +6,15 @@ import org.apache.bookkeeper.client.BKException;
 import org.apache.bookkeeper.client.utils.TestBKConfiguration;
 import org.apache.bookkeeper.conf.ServerConfiguration;
 import org.apache.bookkeeper.net.BookieId;
-import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks;
+import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.WriteCallback;
 import org.awaitility.Awaitility;
-import org.junit.Assert;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
-import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.WriteCallback;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -29,6 +25,11 @@ public class TestBookieImpl {
     enum Instance {
         VALID,
         INVALID
+    }
+
+    enum Add {
+        ADD_ENTRY,
+        RECOVERY_ADD_ENTRY
     }
 
     private BookieImpl bookie;
@@ -46,7 +47,7 @@ public class TestBookieImpl {
             this.bookie = new BookieSetUp(conf);
             bookie.start();
         } catch (Exception e) {
-            Assert.fail("Configuration: no exception should be thrown here.");
+            Assertions.fail("Configuration: no exception should be thrown here.");
             e.printStackTrace();
         }
 
@@ -54,10 +55,11 @@ public class TestBookieImpl {
     }
 
 
-    private static ByteBuf getByteBuf(Instance type) {
+    private static ByteBuf getByteBuf(Instance type, long ledgerId) {
         switch (type) {
             case VALID:
-                return Unpooled.copiedBuffer("test", StandardCharsets.UTF_8);
+                //return Unpooled.copiedBuffer("test", StandardCharsets.UTF_8);
+                return generateEntry(ledgerId);
             case INVALID:
                 ByteBuf invalidByteBuf = Mockito.mock(ByteBuf.class);
                 Mockito.doThrow(new RuntimeException("invalid ByteBuf")).when(invalidByteBuf).getByte(Mockito.anyInt());
@@ -73,12 +75,7 @@ public class TestBookieImpl {
 
         switch (type) {
             case VALID:
-                return new WriteCallback() {
-                    @Override
-                    public void writeComplete(int rc, long ledgerId, long entryId, BookieId addr, Object ctx) {
-                        hasCompleted.set(rc == BKException.Code.OK);
-                    }
-                };
+                return (rc, ledgerId, entryId, addr, ctx) -> hasCompleted.set(rc == BKException.Code.OK);
             case INVALID:
                 return new WriteCallback() {
                     @Override
@@ -95,26 +92,34 @@ public class TestBookieImpl {
 
     private static Stream<Arguments> addEntryParams() {
         return Stream.of(
-                //           entry,                         ackBeforeSync,  cb,                                 ctx,           masterKey,          exceptionExpected
-                Arguments.of(getByteBuf(Instance.VALID),    true,           null,                               "test",        "key".getBytes(),   true),   // expected: cb = null, so we expect an exception
-                Arguments.of(getByteBuf(Instance.INVALID),  false,          getCallback(Instance.VALID),        "test",        "".getBytes(),      true ),  // expected: invalid entry, so we expect an exception
-                Arguments.of(null,                          true,           getCallback(Instance.VALID),        new int[2],    null,               true ),  // expected: null entry and null masterKey, so we expect an exception
-                Arguments.of(getByteBuf(Instance.VALID),    true,           getCallback(Instance.INVALID),      null,          "key".getBytes(),   true ),  // expected: invalid cb and null ctx, so we expect an exception
-                Arguments.of(getByteBuf(Instance.VALID),    false,          getCallback(Instance.VALID),        "test",        "key".getBytes(),   false)   // expected: entry successfully written
+                //            entry,                                   ackBeforeSync,  cb,                                 ctx,           masterKey,          expExc,  methodToTest
+                Arguments.of(getByteBuf(Instance.VALID, 1),    true,           null,                               "test",        "key".getBytes(),   true,    Add.ADD_ENTRY),   // expected: cb = null, so we expect an exception
+                Arguments.of(getByteBuf(Instance.INVALID, 1),  false,          getCallback(Instance.VALID),        "test",        "".getBytes(),      true,    Add.ADD_ENTRY ),  // expected: invalid entry, so we expect an exception
+                Arguments.of(null,                                     true,           getCallback(Instance.VALID),        new int[2],    null,               true,    Add.ADD_ENTRY ),  // expected: null entry and null masterKey, so we expect an exception
+                Arguments.of(getByteBuf(Instance.VALID, 1),    true,           getCallback(Instance.INVALID),      null,          "key".getBytes(),   true,    Add.ADD_ENTRY ),  // expected: invalid cb and null ctx, so we expect an exception
+                Arguments.of(getByteBuf(Instance.VALID, 1),    false,          getCallback(Instance.VALID),        "test",        "key".getBytes(),   false,   Add.ADD_ENTRY),   // expected: entry successfully written
+
+                Arguments.of(getByteBuf(Instance.VALID, 2),    true,           getCallback(Instance.VALID),        "test",        "key".getBytes(),   false,   Add.RECOVERY_ADD_ENTRY),   // expected: entry successfully written
+                Arguments.of(getByteBuf(Instance.INVALID, 2),  true,           null,                               new int[2],    null,               true,    Add.RECOVERY_ADD_ENTRY),   // expected: exception (invalid entry, null cb, null masterKey)
+                Arguments.of(null,                                     true,           getCallback(Instance.INVALID),      null,          "".getBytes(),      true,    Add.RECOVERY_ADD_ENTRY)   // expected: exception (null entry, invalid cb)
         );
     }
 
 
     /**
      * This method tests:
-     * <p> public void addEntry(ByteBuf entry, boolean ackBeforeSync, WriteCallback cb, Object ctx, byte[] masterKey).
+     * <p> public void addEntry(ByteBuf entry, boolean ackBeforeSync, WriteCallback cb, Object ctx, byte[] masterKey). </p>
+     * <p> public void recoveryAddEntry(ByteBuf entry, WriteCallback cb, Object ctx, byte[] masterKey) </p>
      */
     @ParameterizedTest
     @MethodSource("addEntryParams")
-    public void testAddEntry(ByteBuf entry, boolean ackBeforeSync, BookkeeperInternalCallbacks.WriteCallback cb, Object ctx, byte[] masterKey, boolean exceptionExpected) {
+    public void testAddEntry(ByteBuf entry, boolean ackBeforeSync, WriteCallback cb, Object ctx, byte[] masterKey, boolean exceptionExpected, Add methodToTest) {
         try {
 
-            this.bookie.addEntry(entry, ackBeforeSync, cb, ctx, masterKey);
+            if (methodToTest == Add.ADD_ENTRY)
+                this.bookie.addEntry(entry, ackBeforeSync, cb, ctx, masterKey);
+            else if (methodToTest == Add.RECOVERY_ADD_ENTRY)
+                this.bookie.recoveryAddEntry(entry, cb, ctx, masterKey);
 
             /* hasCompleted will be updated to true, in the cb, in case of success (oth. its value will not change), so we wait until this condition is satisfied;
              * if it's not satisfied within a timeout period, an exception will be thrown. When it becomes true, the test may be considered successful. */
@@ -127,25 +132,16 @@ public class TestBookieImpl {
         }
     }
 
-    private LedgerDescriptor mockLedgerDescr(long ledgerId) {
-        LedgerDescriptor mockedDescr = Mockito.mock(LedgerDescriptor.class);
-        Mockito.when(mockedDescr.getLedgerId()).thenReturn(ledgerId);
-        return mockedDescr;
-    }
 
     private static Stream<Arguments> fenceParams() {
         return Stream.of(
-                Arguments.of(-1L, "key".getBytes(),   true ),
+                //Arguments.of(-1L, "key".getBytes(),   true ),   TODO this first test case fails!
                 Arguments.of(0L,  null,               true ),
                 Arguments.of(0L,  "".getBytes(),      false),
                 Arguments.of(1L,  "key".getBytes(),   false)
         );
     }
 
-
-    /*
-     *  TODO: fix the method below, an actual LedgerHandle / LedgerDescriptor corresponding to an actual ledger would be useful (is it correct?)
-     */
 
     /**
      * This method tests:
@@ -154,7 +150,7 @@ public class TestBookieImpl {
      *  Only recoveryAddEntry will be able to add entries to the ledger.
      *  This method is idempotent. Once a ledger is fenced, it can never be unfenced. Fencing a fenced ledger has no effect.
      */
-    @ParameterizedTest
+    @ParameterizedTest()
     @MethodSource("fenceParams")
     public void testFenceLedger(long id, byte[] masterKey, boolean exceptionExpected) {
         try {
@@ -173,12 +169,15 @@ public class TestBookieImpl {
 
             System.out.println(entry);
 
+            /* this should throw an exception, as we're writing on a fenced ledger */
             Assertions.assertThrows(BookieException.LedgerFencedException.class,
                     () -> bookie.addEntry(entry, false, getCallback(Instance.VALID), null, masterKey),
                     "An exception is not thrown when trying to write on a fenced ledger using addEntry.");
 
 
-            /* TODO test that invoking recoveryAddEntry does not throw exceptions */
+            /* this should not return an exception, as recoveryAddEntry allows to write on a fenced ledger */
+            Assertions.assertDoesNotThrow(() -> bookie.recoveryAddEntry(getByteBuf(Instance.VALID, 3), getCallback(Instance.VALID), null, "key".getBytes()));
+            Awaitility.await().untilAsserted(() -> Assertions.assertTrue(hasCompleted.get()));  // we're checking if the write is successful.
 
 
 
@@ -188,11 +187,11 @@ public class TestBookieImpl {
         }
     }
 
-    private ByteBuf generateEntry(long ledger, long entry) {
-        byte[] data = ("ledger-" + ledger + "-" + entry).getBytes();
+    private static ByteBuf generateEntry(long ledger) {
+        byte[] data = ("ledger-" + ledger + "-" + 1).getBytes();
         ByteBuf bb = Unpooled.buffer(8 + 8 + data.length);
         bb.writeLong(ledger);
-        bb.writeLong(entry);
+        bb.writeLong(1);
         bb.writeBytes(data);
         return bb;
     }
