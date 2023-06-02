@@ -7,6 +7,7 @@ import org.apache.bookkeeper.client.utils.TestBKConfiguration;
 import org.apache.bookkeeper.conf.ServerConfiguration;
 import org.apache.bookkeeper.net.BookieId;
 import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks;
+import org.awaitility.Awaitility;
 import org.junit.Assert;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -14,11 +15,13 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
+import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.WriteCallback;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
 
 public class TestBookieImpl {
@@ -29,7 +32,7 @@ public class TestBookieImpl {
     }
 
     private BookieImpl bookie;
-    private static long ledgerId;
+    private static final AtomicBoolean hasCompleted = new AtomicBoolean(false);
 
     public TestBookieImpl() {
         setUpBookie();
@@ -39,8 +42,9 @@ public class TestBookieImpl {
 
         try {
             ServerConfiguration conf = TestBKConfiguration.newServerConfiguration();
+            conf.setJournalWriteData(false);    // this to ensure that cb is used
             this.bookie = new BookieSetUp(conf);
-            //bookie.start();
+            bookie.start();
         } catch (Exception e) {
             Assert.fail("Configuration: no exception should be thrown here.");
             e.printStackTrace();
@@ -65,23 +69,18 @@ public class TestBookieImpl {
 
     }
 
-    private static BookkeeperInternalCallbacks.WriteCallback getCallback(Instance type) {
+    private static WriteCallback getCallback(Instance type) {
 
         switch (type) {
             case VALID:
-                return new BookkeeperInternalCallbacks.WriteCallback() {
+                return new WriteCallback() {
                     @Override
                     public void writeComplete(int rc, long ledgerId, long entryId, BookieId addr, Object ctx) {
-                        if (rc == BKException.Code.OK) {
-                            System.out.println("Success");
-                        }
-                        else {
-                            System.out.println("Fail");
-                        }
+                        hasCompleted.set(rc == BKException.Code.OK);
                     }
                 };
             case INVALID:
-                return new BookkeeperInternalCallbacks.WriteCallback() {
+                return new WriteCallback() {
                     @Override
                     public void writeComplete(int rc, long ledgerId, long entryId, BookieId addr, Object ctx) {
                         throw new RuntimeException("Invalid callback");
@@ -97,11 +96,11 @@ public class TestBookieImpl {
     private static Stream<Arguments> addEntryParams() {
         return Stream.of(
                 //           entry,                         ackBeforeSync,  cb,                                 ctx,           masterKey,          exceptionExpected
-                Arguments.of(getByteBuf(Instance.VALID),    true,           null,                               "test",        "key".getBytes(),   true),   // expected: cb = null, so we expect an exception (if cb is actually used!)
+                Arguments.of(getByteBuf(Instance.VALID),    true,           null,                               "test",        "key".getBytes(),   true),   // expected: cb = null, so we expect an exception
                 Arguments.of(getByteBuf(Instance.INVALID),  false,          getCallback(Instance.VALID),        "test",        "".getBytes(),      true ),  // expected: invalid entry, so we expect an exception
                 Arguments.of(null,                          true,           getCallback(Instance.VALID),        new int[2],    null,               true ),  // expected: null entry and null masterKey, so we expect an exception
                 Arguments.of(getByteBuf(Instance.VALID),    true,           getCallback(Instance.INVALID),      null,          "key".getBytes(),   true ),  // expected: invalid cb and null ctx, so we expect an exception
-                Arguments.of(getByteBuf(Instance.VALID),    false,          getCallback(Instance.VALID),        "test",        "".getBytes(),      false)   // expected: entry successfully written
+                Arguments.of(getByteBuf(Instance.VALID),    false,          getCallback(Instance.VALID),        "test",        "key".getBytes(),   false)   // expected: entry successfully written
         );
     }
 
@@ -117,27 +116,29 @@ public class TestBookieImpl {
 
             this.bookie.addEntry(entry, ackBeforeSync, cb, ctx, masterKey);
 
-            /* Here a method annotated with @VisibleForTesting is used */
-            LedgerDescriptor descriptor = this.bookie.getLedgerForEntry(entry, masterKey);
-            ledgerId = descriptor.getLedgerId();
-
-            Assertions.assertNotNull(descriptor);   // if the descriptor is not null, then it exists a ledger in which the entry has been written, so the writing was successful
-
-            /* TODO: the test is successful also if we expect an exception but no exception is thrown and the entry is correctly written
-                (e.g. if the cb is never used, as in this case, the test will never fail also if it is equal to null, as long as the entry is written anyways) */
+            /* hasCompleted will be updated to true, in the cb, in case of success (oth. its value will not change), so we wait until this condition is satisfied;
+             * if it's not satisfied within a timeout period, an exception will be thrown. When it becomes true, the test may be considered successful. */
+            Awaitility.await().untilAsserted(() -> Assertions.assertTrue(hasCompleted.get()));
 
 
-        } catch (Exception e) {
+        } catch (IOException | InterruptedException | BookieException | RuntimeException e) {
             Assertions.assertTrue(exceptionExpected);
             e.printStackTrace();
         }
     }
 
+    private LedgerDescriptor mockLedgerDescr(long ledgerId) {
+        LedgerDescriptor mockedDescr = Mockito.mock(LedgerDescriptor.class);
+        Mockito.when(mockedDescr.getLedgerId()).thenReturn(ledgerId);
+        return mockedDescr;
+    }
+
     private static Stream<Arguments> fenceParams() {
         return Stream.of(
-                Arguments.of(-1,        "key".getBytes(),   true ),
-                Arguments.of(0,         "".getBytes(),      true ),
-                Arguments.of(ledgerId,  "key".getBytes(),   false)
+                Arguments.of(-1L, "key".getBytes(),   true ),
+                Arguments.of(0L,  null,               true ),
+                Arguments.of(0L,  "".getBytes(),      false),
+                Arguments.of(1L,  "key".getBytes(),   false)
         );
     }
 
@@ -149,20 +150,51 @@ public class TestBookieImpl {
     /**
      * This method tests:
      * <p> public CompletableFuture<Boolean> fenceLedger(long ledgerId, byte[] masterKey)
+     * <p> fenceLedger description (javadoc): Fences a ledger. From this point on, clients will be unable to write to this ledger.
+     *  Only recoveryAddEntry will be able to add entries to the ledger.
+     *  This method is idempotent. Once a ledger is fenced, it can never be unfenced. Fencing a fenced ledger has no effect.
      */
     @ParameterizedTest
     @MethodSource("fenceParams")
     public void testFenceLedger(long id, byte[] masterKey, boolean exceptionExpected) {
         try {
+
+            /* TODO: it seems that the ledgerId value is not checked to be non negative, is this a bug? */
+
             CompletableFuture<Boolean> retValue = this.bookie.fenceLedger(id, masterKey);
-            Assertions.assertTrue(retValue.get());
-        } catch (IOException | BookieException e) {
+            Assertions.assertTrue(retValue.get(), "The ledger has not been fenced, but no exception has been thrown.");
+            Assertions.assertFalse(exceptionExpected, "The ledger has been fenced, but with incorrect parameters.");
+
+            /* At this point, the ledger has been fenced, so we shouldn't be able to write on them (except using recoveryAddEntry).
+            *  We can test this trying to invoke the method addEntry, and expecting an exception  */
+
+            /* using a method annotated with @VisibleForTesting */
+            ByteBuf entry = bookie.createMasterKeyEntry(id, masterKey);
+
+            System.out.println(entry);
+
+            Assertions.assertThrows(BookieException.LedgerFencedException.class,
+                    () -> bookie.addEntry(entry, false, getCallback(Instance.VALID), null, masterKey),
+                    "An exception is not thrown when trying to write on a fenced ledger using addEntry.");
+
+
+            /* TODO test that invoking recoveryAddEntry does not throw exceptions */
+
+
+
+        } catch (IOException | BookieException | InterruptedException | ExecutionException e) {
+            e.printStackTrace();
             Assertions.assertTrue(exceptionExpected);
-        } catch (ExecutionException e) {
-            throw new RuntimeException(e);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
         }
+    }
+
+    private ByteBuf generateEntry(long ledger, long entry) {
+        byte[] data = ("ledger-" + ledger + "-" + entry).getBytes();
+        ByteBuf bb = Unpooled.buffer(8 + 8 + data.length);
+        bb.writeLong(ledger);
+        bb.writeLong(entry);
+        bb.writeBytes(data);
+        return bb;
     }
 
 
