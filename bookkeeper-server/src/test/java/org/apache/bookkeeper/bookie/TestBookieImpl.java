@@ -3,7 +3,7 @@ package org.apache.bookkeeper.bookie;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import org.apache.bookkeeper.client.BKException;
-import org.apache.bookkeeper.client.utils.TestBKConfiguration;
+import org.apache.bookkeeper.bookie.TestBKConfiguration;
 import org.apache.bookkeeper.conf.ServerConfiguration;
 import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.WriteCallback;
 import org.awaitility.Awaitility;
@@ -44,7 +44,7 @@ public class TestBookieImpl {
         try {
             ServerConfiguration conf = TestBKConfiguration.newServerConfiguration();
             conf.setJournalWriteData(false);    // this to ensure that cb is used
-            this.bookie = new BookieSetUp(conf);
+            bookie = new BookieSetUp(conf);
             bookie.start();
         } catch (Exception e) {
             Assertions.fail("Configuration: no exception should be thrown here.");
@@ -114,9 +114,9 @@ public class TestBookieImpl {
         try {
 
             if (methodToTest == Add.ADD_ENTRY)
-                this.bookie.addEntry(entry, ackBeforeSync, cb, ctx, masterKey);
+                bookie.addEntry(entry, ackBeforeSync, cb, ctx, masterKey);
             else if (methodToTest == Add.RECOVERY_ADD_ENTRY)
-                this.bookie.recoveryAddEntry(entry, cb, ctx, masterKey);
+                bookie.recoveryAddEntry(entry, cb, ctx, masterKey);
 
             /* hasCompleted will be updated to true, in the cb, in case of success (oth. its value will not change), so we wait until this condition is satisfied;
              * if it's not satisfied within a timeout period, an exception will be thrown. When it becomes true, the test may be considered successful. */
