@@ -1,11 +1,14 @@
 package org.apache.bookkeeper.proto;
 
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelPromise;
 import org.apache.bookkeeper.bookie.BookieException;
 import org.apache.bookkeeper.bookie.BookieImpl;
 
 import static org.apache.bookkeeper.proto.BookieProtocol.*;
 
+import org.apache.bookkeeper.stats.NullStatsLogger;
 import org.junit.Before;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -22,6 +25,7 @@ import org.mockito.stubbing.Answer;
 
 import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 
 import static org.apache.bookkeeper.proto.ProtoUtils.getMockedHandler;
@@ -86,11 +90,70 @@ public class TestWriteEntryProcessor {
         }
     }
 
+
     /**
-     * This method tests the method:
+     * This method tests:
      * <p> <i>protected void processPacket()</i> </p>
-     * In particular, it tests that:
-     * <p> if the bookie is read-only, we can't write on it </p>
+     * in the case of read-only bookie. In particular, we expect back an error message showing the specific code for "add attempt on read-only bookie" (i.e. EREADONLY exit code).
+     */
+    @Test
+    public void testProcessPacketWithReadOnlyBookie() {
+
+        ParsedAddRequest request = getMockedRequest(VALID);
+
+        Channel channel = mock(Channel.class);
+        when(channel.isOpen()).thenReturn(true);
+
+        BookieRequestHandler handler = mock(BookieRequestHandler.class);
+        ChannelHandlerContext ctx = mock(ChannelHandlerContext.class);
+        when(ctx.channel()).thenReturn(channel);
+        when(handler.ctx()).thenReturn(ctx);
+
+        BookieImpl bookie = mock(BookieImpl.class);
+
+        BookieRequestProcessor processor = mock(BookieRequestProcessor.class);
+        when(processor.getBookie()).thenReturn(bookie);
+        when(processor.getRequestStats()).thenReturn(new RequestStats(NullStatsLogger.INSTANCE));
+        when(channel.isActive()).thenReturn(true);
+        when(channel.isWritable()).thenReturn(true);
+
+        WriteEntryProcessor wep = WriteEntryProcessor.create(
+                request,
+                handler,
+                processor);
+
+        when(bookie.isReadOnly()).thenReturn(true);
+        ChannelPromise mockPromise = mock(ChannelPromise.class);
+        when(channel.newPromise()).thenReturn(mockPromise);
+        when(mockPromise.addListener(any())).thenReturn(mockPromise);
+
+        AtomicReference<Object> writtenObject = new AtomicReference<>();
+        CountDownLatch latch = new CountDownLatch(1);
+        doAnswer(invocationOnMock -> {
+            writtenObject.set(invocationOnMock.getArgument(0));
+            latch.countDown();
+            return null;
+        }).when(channel).writeAndFlush(any(), any());
+
+        wep.processPacket();
+
+        try {
+            latch.await();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        Assertions.assertTrue(writtenObject.get() instanceof Response);
+        Response response = (Response) writtenObject.get();
+        Assertions.assertEquals(BookieProtocol.EREADONLY, response.getErrorCode());
+
+
+    }
+
+    /**
+     * This method tests:
+     * <p> <i>protected void processPacket()</i> </p>
+     * in the case of not read-only bookie. In particular:
      * <p> if the WriteEntryProcessor is well configured and the bookie is not read-only, the write is successful </p>
      * Other test cases will be considered in the integration test with the class BookieImpl.java.
      */
@@ -103,19 +166,10 @@ public class TestWriteEntryProcessor {
 
         BookieRequestProcessor processor = mock(BookieRequestProcessor.class);
         when(processor.getBookie()).thenReturn(bookie);
-        when(bookie.isReadOnly()).thenReturn(true);
 
         WriteEntryProcessor wep = WriteEntryProcessor.create(request, handler, processor);
 
-        /* we're checking if an exception is thrown, when trying to write on a read-only bookie. */
-        try {
-            wep.processPacket();
-            Assertions.fail("We expected an exception.");
-        } catch (Exception e) {
-            assert true;
-        }
-
-        /* now we can test the case in which the destination bookie is not read-only */
+        /* we test the case in which the destination bookie is not read-only */
         when(bookie.isReadOnly()).thenReturn(false);
 
         boolean[] successfulWrite = {false};
