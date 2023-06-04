@@ -1,13 +1,14 @@
 package org.apache.bookkeeper.proto;
 
 import io.netty.channel.ChannelHandlerContext;
+import org.apache.bookkeeper.bookie.BookieException;
 import org.apache.bookkeeper.bookie.BookieImpl;
 
 import static org.apache.bookkeeper.proto.BookieProtocol.*;
 
 import org.junit.Before;
-import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -19,93 +20,22 @@ import org.mockito.invocation.InvocationOnMock;
 import org.mockito.junit.MockitoJUnitRunner;
 import org.mockito.stubbing.Answer;
 
+import java.io.IOException;
+import java.util.concurrent.CountDownLatch;
 import java.util.stream.Stream;
+
+import static org.apache.bookkeeper.proto.ProtoUtils.getMockedHandler;
+import static org.apache.bookkeeper.proto.ProtoUtils.getMockedProcessor;
+import static org.apache.bookkeeper.proto.ProtoUtils.getMockedRequest;
+import static org.apache.bookkeeper.proto.ProtoUtils.VALID;
+import static org.apache.bookkeeper.proto.ProtoUtils.INVALID;
+import static org.apache.bookkeeper.proto.ProtoUtils.NULL;
 
 /**
  * This class aims to test, in isolation, the class WriteEntryProcessor.java.
  */
 @RunWith(MockitoJUnitRunner.class)
 public class TestWriteEntryProcessor {
-
-
-    /* Types of instances */
-    private final static int VALID = 1;
-    private final static int INVALID = 2;
-    private final static int NULL = 3;
-
-    @Before
-    public void setUp() {
-        /* BookieRequestProcessor mock configuration */
-
-
-        /* BookieRequestHandler mock configuration */
-
-
-        /* ParsedAddRequest mock configuration */
-
-    }
-
-    private static BookieProtocol.ParsedAddRequest getMockedRequest(int type) {
-
-        BookieProtocol.ParsedAddRequest mockedRequest = mock(BookieProtocol.ParsedAddRequest.class);
-
-        switch (type) {
-            case VALID:
-                when(mockedRequest.getEntryId()).thenReturn(1L);
-                when(mockedRequest.getLedgerId()).thenReturn(1L);
-                when(mockedRequest.getOpCode()).thenReturn(ADDENTRY);
-
-                return mockedRequest;
-            case INVALID:
-                doThrow(new RuntimeException("Invalid ParsedAddRequest")).when(mockedRequest).getData();
-                return mockedRequest;
-            case NULL:
-                return null;
-            default:
-                Assertions.fail("getMockedRequest: unexpected instance type.");
-                return null;
-        }
-    }
-
-    private static BookieRequestHandler getMockedHandler(int type) {
-
-        BookieRequestHandler mockedHandler = mock(BookieRequestHandler.class);
-        ChannelHandlerContext ctx = mock(ChannelHandlerContext.class);
-
-        switch (type) {
-            case VALID:
-                when(mockedHandler.ctx()).thenReturn(ctx);
-                return mockedHandler;
-            case INVALID:
-                doThrow(new RuntimeException("Invalid BookieRequestHandler")).when(mockedHandler).ctx();
-                return mockedHandler;
-            case NULL:
-                return null;
-            default:
-                Assertions.fail("getMockedHandler: unexpected instance type.");
-                return null;
-        }
-    }
-
-    private static BookieRequestProcessor getMockedProcessor(int type) {
-
-        BookieRequestProcessor mockedProcessor = mock(BookieRequestProcessor.class);
-        BookieImpl bookie = mock(BookieImpl.class);
-
-        switch (type) {
-            case VALID:
-                when(mockedProcessor.getBookie()).thenReturn(bookie);
-                return mockedProcessor;
-            case INVALID:
-                doThrow(new RuntimeException("Invalid BookieRequestProcessor")).when(mockedProcessor).getBookie();
-                return mockedProcessor;
-            case NULL:
-                return null;
-            default:
-                Assertions.fail("getMockedProcessor: unexpected instance type.");
-                return null;
-        }
-    }
 
     /*
      *  TODO: ask if the fact that invalid requests and processors are not handled is considerable a bug (failed tests are commented out).
@@ -140,7 +70,7 @@ public class TestWriteEntryProcessor {
                 Arguments.of(getMockedRequest(NULL), getMockedHandler(INVALID), getMockedProcessor(INVALID), true),
                 Arguments.of(getMockedRequest(NULL), getMockedHandler(NULL), getMockedProcessor(INVALID), true),
                 Arguments.of(getMockedRequest(NULL), getMockedHandler(INVALID), getMockedProcessor(NULL), true)
-                );
+        );
     }
 
     @ParameterizedTest
@@ -149,27 +79,20 @@ public class TestWriteEntryProcessor {
         try {
             WriteEntryProcessor p = WriteEntryProcessor.create(request, handler, processor);
             Assertions.assertFalse(exceptionExpected);
+
         } catch (RuntimeException e) {
             System.out.println(e.getMessage());
             Assertions.assertTrue(exceptionExpected);
         }
     }
 
-    public static Stream<Arguments> processPacketParams() {
-        return Stream.of(
-                Arguments.of(true),
-                Arguments.of(false)
-        );
-    }
-
     /**
-     *  This method tests the method:
-     *  <p> <i>protected void processPacket()</i> </p>
-     *  In particular, it tests that:
-     *  <p> if the bookie is read-only, we can't write on it </p>
-     *  <p> if the WriteEntryProcessor is well configured, the write is successful </p>
-     *  //TODO: add other testing scenarios
-     *
+     * This method tests the method:
+     * <p> <i>protected void processPacket()</i> </p>
+     * In particular, it tests that:
+     * <p> if the bookie is read-only, we can't write on it </p>
+     * <p> if the WriteEntryProcessor is well configured and the bookie is not read-only, the write is successful </p>
+     * Other test cases will be considered in the integration test with the class BookieImpl.java.
      */
     @Test
     public void testProcessPacket() {
@@ -182,33 +105,55 @@ public class TestWriteEntryProcessor {
         when(processor.getBookie()).thenReturn(bookie);
         when(bookie.isReadOnly()).thenReturn(true);
 
-
         WriteEntryProcessor wep = WriteEntryProcessor.create(request, handler, processor);
 
         /* we're checking if an exception is thrown, when trying to write on a read-only bookie. */
-        Assertions.assertThrows(Exception.class, wep::processPacket);
+        try {
+            wep.processPacket();
+            Assertions.fail("We expected an exception.");
+        } catch (Exception e) {
+            assert true;
+        }
 
         /* now we can test the case in which the destination bookie is not read-only */
-
-        // TODO: check if the write was successful, modifying the behavior of processor
-
-        /*when(bookie.isReadOnly()).thenReturn(false);
-
+        when(bookie.isReadOnly()).thenReturn(false);
 
         boolean[] successfulWrite = {false};
 
-        doAnswer(new Answer() {
-            @Override
-            public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
-                System.out.println(invocationOnMock.getArguments()[0]);
+        /* The following code defines a custom behavior for the method addEntry of the mocked bookie, in order to simulate a successful adding of the entry.
+        *  In particular, if the method does not throw exceptions, we assume that the entry is successfully added. */
+        try {
+            doAnswer(invocationOnMock -> {
                 successfulWrite[0] = true;
-                return true;
-            }
-        }).when(handler).prepareSendResponseV2(eq(EOK), any());
+                return null;
+            }).when(bookie).addEntry(any(), anyBoolean(), any(), any(), any());
 
+            wep.processPacket();
 
+        } catch (InterruptedException | IOException | BookieException e) {
+            Assertions.fail("Unexpected exception");
+        }
 
-        Assertions.assertTrue(successfulWrite[0]); */
+        Assertions.assertTrue(successfulWrite[0]);
+
+        /* testing the case of a recovery add */
+        when(request.isRecoveryAdd()).thenReturn(true);
+
+        boolean[] successfulRecoveryWrite = {false};
+
+        try {
+            doAnswer(invocationOnMock -> {
+                successfulRecoveryWrite[0] = true;
+                return null;
+            }).when(bookie).recoveryAddEntry(any(), any(), any(), any());
+
+            wep.processPacket();
+
+        } catch (InterruptedException | IOException | BookieException e) {
+            Assertions.fail("Unexpected exception");
+        }
+
+        Assertions.assertTrue(successfulRecoveryWrite[0]);
     }
 
 }
