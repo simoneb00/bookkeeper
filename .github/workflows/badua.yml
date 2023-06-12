@@ -15,7 +15,8 @@ jobs:
           java-version: 8.0.372
           distribution: 'temurin'
       - name: Clone and build ba-dua  # to get the CLI
-        run: git clone https://www.github.com/saeg/ba-dua.git
+        run: |
+             git clone https://www.github.com/saeg/ba-dua.git
              cd ba-dua
              git checkout tags/ba-dua-0.6.0 -b ba-dua-0.6.0
              mvn clean install
