@@ -344,9 +344,11 @@
                         <configuration>
                             <targetClasses>
                                 <param>org.apache.bookkeeper.proto.WriteEntryProcessor</param>
+                                <param>org.apache.bookkeeper.bookie.BookieImpl</param>
                             </targetClasses>
                             <targetTests>
                                 <param>org.apache.bookkeeper.proto.TestWriteEntryProcessor</param>
+                                <param>org.apache.bookkeeper.bookie.TestBookieImpl</param>
                             </targetTests>
                         </configuration>
                         <executions>
@@ -357,6 +359,13 @@
                                 </goals>
                             </execution>
                         </executions>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.pitest</groupId>
+                                <artifactId>pitest-junit5-plugin</artifactId>
+                                <version>1.2.0</version>
+                            </dependency>
+                        </dependencies>
                     </plugin>
                 </plugins>
             </build>
@@ -367,8 +376,8 @@
                 <activeByDefault>false</activeByDefault>
             </activation>
             <properties>
-                <!-- Use a stable version istead of SNAPSHOT one -->
-                <ba-dua.version>0.8.1-SNAPSHOT</ba-dua.version>
+                <!-- Use a stable version instead of SNAPSHOT one -->
+                <ba-dua.version>0.6.0</ba-dua.version>
                 <argLine>-javaagent:target/dependency/ba-dua-agent-rt-${ba-dua.version}-all.jar
                     -Doutput.file=target/badua.ser
                 </argLine>
@@ -378,7 +387,7 @@
                 <dependency>
                     <groupId>br.usp.each.saeg</groupId>
                     <artifactId>ba-dua-cli</artifactId>
-                    <version>0.8.1-SNAPSHOT</version>
+                    <version>${ba-dua.version}</version>
                 </dependency>
             </dependencies>
             <build>
@@ -399,7 +408,7 @@
                                             <groupId>br.usp.each.saeg</groupId>
                                             <artifactId>ba-dua-agent-rt</artifactId>
                                             <classifier>all</classifier>
-                                            <version>0.8.1-SNAPSHOT</version>
+                                            <version>${ba-dua.version}</version>
                                         </artifactItem>
                                     </artifactItems>
                                 </configuration>

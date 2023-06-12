@@ -36,7 +36,7 @@ import static org.apache.bookkeeper.proto.ProtoUtils.INVALID;
 import static org.apache.bookkeeper.proto.ProtoUtils.NULL;
 
 /**
- * This class aims to test, in isolation, the class WriteEntryProcessor.java.
+ * Unit test for the class {@link WriteEntryProcessor}
  */
 @RunWith(MockitoJUnitRunner.class)
 public class TestWriteEntryProcessor {
@@ -82,6 +82,7 @@ public class TestWriteEntryProcessor {
     public void testCreateWEP(ParsedAddRequest request, BookieRequestHandler handler, BookieRequestProcessor processor, boolean exceptionExpected) {
         try {
             WriteEntryProcessor p = WriteEntryProcessor.create(request, handler, processor);
+            Assertions.assertNotNull(p);
             Assertions.assertFalse(exceptionExpected);
 
         } catch (RuntimeException e) {
