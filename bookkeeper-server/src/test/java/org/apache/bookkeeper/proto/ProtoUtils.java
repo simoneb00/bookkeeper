@@ -27,6 +27,16 @@ public class ProtoUtils {
                 return mockedRequest;
             case INVALID:
                 doThrow(new RuntimeException("Invalid ParsedAddRequest")).when(mockedRequest).getData();
+                doThrow(new RuntimeException("Invalid ParsedAddRequest")).when(mockedRequest).recycle();
+                doThrow(new RuntimeException("Invalid ParsedAddRequest")).when(mockedRequest).release();
+                doThrow(new RuntimeException("Invalid ParsedAddRequest")).when(mockedRequest).getLedgerId();
+                doThrow(new RuntimeException("Invalid ParsedAddRequest")).when(mockedRequest).getEntryId();
+                doThrow(new RuntimeException("Invalid ParsedAddRequest")).when(mockedRequest).getFlags();
+                doThrow(new RuntimeException("Invalid ParsedAddRequest")).when(mockedRequest).getMasterKey();
+                doThrow(new RuntimeException("Invalid ParsedAddRequest")).when(mockedRequest).getOpCode();
+                doThrow(new RuntimeException("Invalid ParsedAddRequest")).when(mockedRequest).getProtocolVersion();
+                doThrow(new RuntimeException("Invalid ParsedAddRequest")).when(mockedRequest).hasMasterKey();
+                doThrow(new RuntimeException("Invalid ParsedAddRequest")).when(mockedRequest).isHighPriority();
                 return mockedRequest;
             case NULL:
                 return null;
@@ -67,6 +77,9 @@ public class ProtoUtils {
                 return mockedProcessor;
             case INVALID:
                 doThrow(new RuntimeException("Invalid BookieRequestProcessor")).when(mockedProcessor).getBookie();
+                doThrow(new RuntimeException("Invalid BookieRequestProcessor")).when(mockedProcessor).onAddRequestStart(any());
+                doThrow(new RuntimeException("Invalid BookieRequestProcessor")).when(mockedProcessor).getRequestStats();
+                doThrow(new RuntimeException("Invalid BookieRequestProcessor")).when(mockedProcessor).blacklistChannel(any());
                 return mockedProcessor;
             case NULL:
                 return null;
