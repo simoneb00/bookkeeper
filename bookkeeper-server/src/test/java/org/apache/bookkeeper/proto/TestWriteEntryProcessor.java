@@ -91,14 +91,28 @@ public class TestWriteEntryProcessor {
         }
     }
 
+    private static Stream<Arguments> processOnROBookieParams() {
+        return Stream.of(
+                Arguments.of(false, false),
+                Arguments.of(false, true),
+                Arguments.of(true, false)
+        );
+    }
+
 
     /**
      * This method tests:
      * <p> <i>protected void processPacket()</i> </p>
      * in the case of read-only bookie. In particular, we expect back an error message showing the specific code for "add attempt on read-only bookie" (i.e. EREADONLY exit code).
+     * We test the cases of:
+     * <p>high priority write when the processor is not available for high priority writes</p>
+     * <p>low priority write when the processor is available for high priority writes</p>
+     * <p>low priority write when the processor is not available for high priority writes</p>
+     * In the three cases, the expected result is always EREADONLY response.
      */
-    @Test
-    public void testProcessPacketWithReadOnlyBookie() {
+    @ParameterizedTest
+    @MethodSource("processOnROBookieParams")
+    public void testProcessPacketWithReadOnlyBookie(boolean isHighPriority, boolean isAvailableForHighPriorityWrite) {
 
         ParsedAddRequest request = getMockedRequest(VALID);
 
@@ -117,6 +131,10 @@ public class TestWriteEntryProcessor {
         when(processor.getRequestStats()).thenReturn(new RequestStats(NullStatsLogger.INSTANCE));
         when(channel.isActive()).thenReturn(true);
         when(channel.isWritable()).thenReturn(true);
+
+        /* we test that, even if the request has high priority, it cannot be executed if the processor is not available for high priority writes */
+        when(request.isHighPriority()).thenReturn(isHighPriority);
+        when(processor.getBookie().isAvailableForHighPriorityWrites()).thenReturn(isAvailableForHighPriorityWrite);
 
         WriteEntryProcessor wep = WriteEntryProcessor.create(
                 request,
@@ -177,6 +195,78 @@ public class TestWriteEntryProcessor {
 
         /* The following code defines a custom behavior for the method addEntry of the mocked bookie, in order to simulate a successful adding of the entry.
         *  In particular, if the method does not throw exceptions, we assume that the entry is successfully added. */
+        try {
+            doAnswer(invocationOnMock -> {
+                successfulWrite[0] = true;
+                return null;
+            }).when(bookie).addEntry(any(), anyBoolean(), any(), any(), any());
+
+            wep.processPacket();
+
+        } catch (InterruptedException | IOException | BookieException e) {
+            Assertions.fail("Unexpected exception");
+        }
+
+        Assertions.assertTrue(successfulWrite[0]);
+
+        /* testing the case of a recovery add */
+        when(request.isRecoveryAdd()).thenReturn(true);
+
+        boolean[] successfulRecoveryWrite = {false};
+
+        try {
+            doAnswer(invocationOnMock -> {
+                successfulRecoveryWrite[0] = true;
+                return null;
+            }).when(bookie).recoveryAddEntry(any(), any(), any(), any());
+
+            wep.processPacket();
+
+        } catch (InterruptedException | IOException | BookieException e) {
+            Assertions.fail("Unexpected exception");
+        }
+
+        Assertions.assertTrue(successfulRecoveryWrite[0]);
+    }
+
+    /**
+     * This method has been introduced after evaluating the coverage. It tests that a high priority request
+     * is processed even on a read-only bookie, if the processor is available for high priority requests.
+     */
+    @Test
+    public void testProcessHighPriorityRequestOnReadOnlyBookie() {
+        ParsedAddRequest request = getMockedRequest(VALID);
+
+        Channel channel = mock(Channel.class);
+        when(channel.isOpen()).thenReturn(true);
+
+        BookieRequestHandler handler = mock(BookieRequestHandler.class);
+        ChannelHandlerContext ctx = mock(ChannelHandlerContext.class);
+        when(ctx.channel()).thenReturn(channel);
+        when(handler.ctx()).thenReturn(ctx);
+
+        BookieImpl bookie = mock(BookieImpl.class);
+
+        BookieRequestProcessor processor = mock(BookieRequestProcessor.class);
+        when(processor.getBookie()).thenReturn(bookie);
+        when(processor.getRequestStats()).thenReturn(new RequestStats(NullStatsLogger.INSTANCE));
+        when(channel.isActive()).thenReturn(true);
+        when(channel.isWritable()).thenReturn(true);
+
+        when(request.isHighPriority()).thenReturn(true);
+        when(processor.getBookie().isAvailableForHighPriorityWrites()).thenReturn(true);
+
+        WriteEntryProcessor wep = WriteEntryProcessor.create(
+                request,
+                handler,
+                processor);
+
+        when(bookie.isReadOnly()).thenReturn(true);
+
+        boolean[] successfulWrite = {false};
+
+        /* The following code defines a custom behavior for the method addEntry of the mocked bookie, in order to simulate a successful adding of the entry.
+         *  In particular, if the method does not throw exceptions, we assume that the entry is successfully added. */
         try {
             doAnswer(invocationOnMock -> {
                 successfulWrite[0] = true;
