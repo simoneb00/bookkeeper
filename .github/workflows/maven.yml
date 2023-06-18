@@ -6,7 +6,7 @@
 # separate terms of service, privacy policy, and support
 # documentation.
 
-name: Java CI with Maven
+name: surefire_failsafe_build
 
 on:
   push:
@@ -27,3 +27,15 @@ jobs:
           distribution: 'temurin'
       - name: Build with Maven
         run: mvn clean verify
+      - name: Upload Surefire reports
+        uses: actions/upload-artifact@v3
+        with: 
+          name: surefire-reports
+          path: bookkeeper-server/target/surefire-reports
+          if-no-files-found: error
+      - name: Upload Failsafe reports
+        uses: actions/upload-artifact@v3
+        with: 
+          name: surefire-reports
+          path: bookkeeper-server/target/failsafe-reports
+          if-no-files-found: error
