@@ -41,9 +41,6 @@ import static org.apache.bookkeeper.proto.ProtoUtils.NULL;
 @RunWith(MockitoJUnitRunner.class)
 public class TestWriteEntryProcessor {
 
-    /*
-     *  TODO: ask if the fact that invalid requests and processors are not handled is considerable a bug (failed tests are commented out).
-     */
     private static Stream<Arguments> createWEPParams() {
         return Stream.of(
                 // ParsedAddRequest instance, BookieRequestHandler instance, BookieRequestProcessor instance, exception expected
