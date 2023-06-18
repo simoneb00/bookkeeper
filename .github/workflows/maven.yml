@@ -36,6 +36,6 @@ jobs:
       - name: Upload Failsafe reports
         uses: actions/upload-artifact@v3
         with: 
-          name: surefire-reports
+          name: failsafe-reports
           path: bookkeeper-server/target/failsafe-reports
           if-no-files-found: error
